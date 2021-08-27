@@ -6,6 +6,27 @@
 #include "memlayout.h"
 #include "spinlock.h"
 #include "proc.h"
+#include "sysinfo.h"
+
+uint64
+sys_sysinfo(void) {
+    uint64 dstaddr;
+    // find user va where we store the sys info
+    if(argaddr(0, &dstaddr) < 0)
+        return -1;
+    struct proc *p = myproc();
+    struct sysinfo info;
+    extern uint64 freemem();
+    extern uint64 nproc();
+
+    info.freemem = freemem();
+    info.nproc = nproc();
+
+    // copy out collected info into user page table
+    if(copyout(p->pagetable, dstaddr, (char *)&info, sizeof(info)) < 0)
+        return -1;
+    return 0;
+}
 
 uint64
 sys_trace(void) {

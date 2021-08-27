@@ -21,6 +21,16 @@ static void freeproc(struct proc *p);
 
 extern char trampoline[]; // trampoline.S
 
+// self-defined func counting running processes
+uint64
+nproc(){
+    uint64 ret = 0;
+    for(int i = 0 ; i < NPROC; ++i) {
+        if(proc[i].state != UNUSED) ++ret;
+    }
+    return ret;
+}
+
 // initialize the proc table at boot time.
 void
 procinit(void)

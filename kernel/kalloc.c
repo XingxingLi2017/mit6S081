@@ -23,6 +23,18 @@ struct {
   struct run *freelist;
 } kmem;
 
+// self-defined func counting free memory
+uint64
+freemem(){
+    uint64 ret = 0;
+    struct run *p = kmem.freelist;
+    while(p) {
+        p = p->next;
+        ++ret;
+    }
+    return ret * PGSIZE;
+}
+
 void
 kinit()
 {
