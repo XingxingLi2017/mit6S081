@@ -15,6 +15,40 @@ extern char etext[];  // kernel.ld sets this to end of kernel code.
 
 extern char trampoline[]; // trampoline.S
 
+// self-defined func for lab 3 pagetables
+void
+formatpte(pte_t pte, int idx, int level) {
+    for(int i = 0 ; i < level ; ++i) {
+        if(i < level - 1)
+            printf(".. ");
+        else
+            printf("..");
+    }
+    //uint64 mask = ~((1 << 10) - 1);
+    uint64 pa = PTE2PA(pte);
+    printf("%d: pte %p pa %p\n", idx, pte, pa);
+}
+
+void 
+vmprint_helper(pagetable_t addr, int level) { 
+    for(int i = 0 ; i < PGSIZE/8 ; ++i) {
+        pte_t pte = addr[i];
+        if(!(pte & PTE_V)) continue;
+        formatpte(pte, i, level);
+        // check WRX flags, only the last layer set up the flags
+        if((pte & (PTE_R|PTE_W|PTE_X)))
+            continue;
+        pagetable_t newpage = (pagetable_t)(PTE2PA(pte));
+        vmprint_helper(newpage, level + 1);
+    }
+}
+
+void
+vmprint(pagetable_t addr) {
+    printf("page table %p\n", addr);
+    vmprint_helper(addr, 1);
+}
+
 /*
  * create a direct-map page table for the kernel.
  */
