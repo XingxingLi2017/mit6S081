@@ -5,7 +5,8 @@
 #include "riscv.h"
 #include "defs.h"
 #include "fs.h"
-
+#include "spinlock.h"
+#include "proc.h"
 /*
  * the kernel's page table.
  */
@@ -47,6 +48,37 @@ void
 vmprint(pagetable_t addr) {
     printf("page table %p\n", addr);
     vmprint_helper(addr, 1);
+}
+
+void
+uvmmap(pagetable_t pt, uint64 va, uint64 pa, uint64 sz, int perm) {
+  if(mappages(pt, va, sz, pa, perm) != 0) {
+    panic("uvmmap");
+  }
+}
+void
+uvmfree2(pagetable_t pt, uint64 va, uint pages) {
+    extern void freewalk(pagetable_t);
+    if(pages > 0) {
+        uvmunmap(pt, va, pages, 1);
+    }
+    freewalk(pt);
+}
+
+pagetable_t
+proc_kpt_init() {
+  pagetable_t kpt;
+  kpt = uvmcreate();
+  if (kpt == 0) return 0;
+  uvmmap(kpt, UART0, UART0, PGSIZE, PTE_R | PTE_W);
+  uvmmap(kpt, VIRTIO0, VIRTIO0, PGSIZE, PTE_R | PTE_W);
+  //uvmmap(kpt, CLINT, CLINT, 0x10000, PTE_R | PTE_W);
+  uvmmap(kpt, PLIC, PLIC, 0x400000, PTE_R | PTE_W);
+  uvmmap(kpt, KERNBASE, KERNBASE, (uint64)etext-KERNBASE, PTE_R | PTE_X);
+  uvmmap(kpt, (uint64)etext, (uint64)etext, PHYSTOP-(uint64)etext, PTE_R | PTE_W);
+  uvmmap(kpt, TRAMPOLINE, (uint64)trampoline, PGSIZE, PTE_R | PTE_X);
+  return kpt;
+  //return kptcopy(kernel_pagetable, 1);
 }
 
 /*
@@ -166,7 +198,8 @@ kvmpa(uint64 va)
   pte_t *pte;
   uint64 pa;
   
-  pte = walk(kernel_pagetable, va, 0);
+  //pte = walk(kernel_pagetable, va, 0);
+  pte = walk(myproc()->kernelpt, va, 0);
   if(pte == 0)
     panic("kvmpa");
   if((*pte & PTE_V) == 0)
