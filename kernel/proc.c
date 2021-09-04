@@ -29,6 +29,8 @@ extern pagetable_t kernel_pagetable;
 extern pte_t* walk(pagetable_t pt, uint64 va, int alloc);
 // free kernel pagetable but remain physical pages
 extern void uvmfree2(pagetable_t pt, uint64 va, uint pages);
+// copy user pt to kernel pt
+extern void copytokpt(pagetable_t upt, pagetable_t kpt, uint64 va, uint64 sz);
 
 extern char trampoline[]; // trampoline.S
 
@@ -157,7 +159,7 @@ found:
 }
 
 void
-proc_freekpt(pagetable_t pt, uint64 kstack) {
+proc_freekpt(pagetable_t pt, uint64 kstack, uint64 procsz) {
    extern char etext[];
    uvmunmap(pt, UART0, 1, 0);
    uvmunmap(pt, VIRTIO0, 1, 0);
@@ -166,8 +168,9 @@ proc_freekpt(pagetable_t pt, uint64 kstack) {
    uvmunmap(pt, KERNBASE, ((uint64)etext-KERNBASE)/PGSIZE, 0);
    uvmunmap(pt, (uint64)etext, (PHYSTOP-(uint64)etext)/PGSIZE, 0);
    uvmunmap(pt, TRAMPOLINE, 1, 0);
-
-   //free kernel stack
+   // free user proc space
+   uvmunmap(pt, 0, PGROUNDUP(procsz) / PGSIZE, 0);
+   // free kernel stack
    uvmfree2(pt, kstack, 1); 
 }
 
@@ -187,7 +190,7 @@ freeproc(struct proc *p)
   
   // free kpt 
   if(p->kernelpt) {
-    proc_freekpt(p->kernelpt, p->kstack);
+    proc_freekpt(p->kernelpt, p->kstack, p->sz);
   }
   p->kernelpt = 0;
 
@@ -271,6 +274,9 @@ userinit(void)
   uvminit(p->pagetable, initcode, sizeof(initcode));
   p->sz = PGSIZE;
 
+  // copy user pt to kernel pt
+  copytokpt(p->pagetable, p->kernelpt, 0, p->sz);
+
   // prepare for the very first "return" from kernel to user.
   p->trapframe->epc = 0;      // user program counter
   p->trapframe->sp = PGSIZE;  // user stack pointer
@@ -324,6 +330,9 @@ fork(void)
     return -1;
   }
   np->sz = p->sz;
+
+  // copy user pt to user kpt
+  copytokpt(np->pagetable, np->kernelpt, 0, np->sz);
 
   np->parent = p;
 

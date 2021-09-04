@@ -43,12 +43,33 @@ sys_sbrk(void)
 {
   int addr;
   int n;
+  extern void copytokpt(pagetable_t upt, pagetable_t kpt, uint64 va, uint64 sz);
 
   if(argint(0, &n) < 0)
     return -1;
   addr = myproc()->sz;
+
+  // check user pt < PLIC limitation
+  if(addr + n >= PLIC) {
+    return -1;
+  }
+
   if(growproc(n) < 0)
     return -1;
+  
+  struct proc *p = myproc();
+  // copy user pt to kernel pt
+  if(n > 0) {
+    // increase proc sz
+    copytokpt(p->pagetable, p->kernelpt, addr, n); 
+  } else {
+    // decrease proc sz
+    // use addr - PGSIZE to avoid unmapping unused PTEs
+    for(long va = addr - PGSIZE; va >= addr + n ; va -= PGSIZE) {
+        uvmunmap(p->kernelpt, va, 1, 0);
+    }
+  }
+
   return addr;
 }
 

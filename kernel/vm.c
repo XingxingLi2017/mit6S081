@@ -81,6 +81,20 @@ proc_kpt_init() {
   //return kptcopy(kernel_pagetable, 1);
 }
 
+// copy user pt to kpt
+extern pte_t *walk(pagetable_t, uint64 va, int alloc);
+void
+copytokpt(pagetable_t upt, pagetable_t kpt, uint64 va, uint64 sz) {
+    if(va >= MAXVA) {
+        return;
+    }
+    for(uint64 i = va ; i < va + sz ; i += PGSIZE) {
+        pte_t *pte = walk(upt, i, 0);
+        pte_t *kpte = walk(kpt, i, 1);
+        *kpte = *pte & ~PTE_U;
+    }
+}
+
 /*
  * create a direct-map page table for the kernel.
  */
@@ -446,7 +460,7 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 int
 copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
 {
-  uint64 n, va0, pa0;
+  /*uint64 n, va0, pa0;
 
   while(len > 0){
     va0 = PGROUNDDOWN(srcva);
@@ -462,7 +476,10 @@ copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
     dst += n;
     srcva = va0 + PGSIZE;
   }
-  return 0;
+  return 0;*/
+
+  extern int copyin_new(pagetable_t, char *, uint64, uint64);
+  return copyin_new(pagetable, dst, srcva, len);
 }
 
 // Copy a null-terminated string from user to kernel.
@@ -472,7 +489,7 @@ copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
 int
 copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 {
-  uint64 n, va0, pa0;
+  /*uint64 n, va0, pa0;
   int got_null = 0;
 
   while(got_null == 0 && max > 0){
@@ -505,5 +522,8 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
     return 0;
   } else {
     return -1;
-  }
+  }*/
+
+  extern int copyinstr_new(pagetable_t, char *, uint64, uint64);
+  return copyinstr_new(pagetable, dst, srcva, max);
 }
